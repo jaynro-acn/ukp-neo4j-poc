@@ -1,258 +1,234 @@
-"""T2 — Define schema and seed Neo4j with enterprise architecture workflow entities."""
+"""Seed Neo4j with a two-domain enterprise graph — Commerce and Payments.
+
+Models the full UKP node hierarchy:
+  ValueStream → Capability (L1/L2/L3) → Domain → Subdomain →
+  BoundedContext → Component → Contract
+
+Demonstrates the ubiquitous language conflict: 'Order' means
+different things in Commerce vs Payments.
+"""
 import json
 import uuid
 from pathlib import Path
 from neo4j import GraphDatabase
 
-URI = "bolt://localhost:7687"
+URI  = "bolt://localhost:7687"
 AUTH = ("neo4j", "ukpneo4j2026")
 ENTITY_IDS_PATH = Path(__file__).parent.parent / "data" / "entity_ids.json"
 
+# ── Seed data ──────────────────────────────────────────────────────────────────
 
-# ── Seed data — enterprise architecture workflow entities ─────────────────────
-
-DOMAINS = [
+VALUE_STREAMS = [
     {
-        "name": "Discovery",
-        "level": "L0",
-        "description": "Encompasses solution concept and domain synthesis workflows — the problem-space framing stage of the SDLC.",
-    },
-    {
-        "name": "Architecture",
-        "level": "L0",
-        "description": "Encompasses domain architecture and blueprint compilation — the solution-space design stage of the SDLC.",
+        "name": "Digital Sales",
+        "description": "End-to-end digital commerce and payment delivery — owns online ordering, checkout, and payment collection.",
     },
 ]
 
-WORKFLOWS = [
-    {
-        "name": "Discovery — Solution Concept",
-        "file": "discovery-solution-concept.command.md",
-        "purpose": "Synthesizes ingested research and business context into a solution concept that frames all downstream domain discovery and architecture work.",
-        "domain": "Discovery",
-        "steps": 9,
-    },
-    {
-        "name": "Discovery — Domain Synthesis",
-        "file": "discovery-domain-synthesis.command.md",
-        "purpose": "Transforms raw event storming outputs into a formal domain model package. Applies DDD modeling expertise to cluster events into bounded contexts.",
-        "domain": "Discovery",
-        "steps": 11,
-        "depends_on_workflow": "Discovery — Solution Concept",
-    },
-    {
-        "name": "Domain Architecture",
-        "file": "arch-domain-architecture.command.md",
-        "purpose": "Generates the Domain Architecture foundation document — translates the domain model into service decomposition, integration architecture, and foundational technical decisions.",
-        "domain": "Architecture",
-        "steps": 7,
-        "depends_on_workflow": "Discovery — Domain Synthesis",
-    },
-    {
-        "name": "Architecture Blueprint Compilation",
-        "file": "arch-compile-blueprint.command.md",
-        "purpose": "Compiles all six architecture view artifacts into a single validated architecture blueprint. Performs cross-view consistency validation.",
-        "domain": "Architecture",
-        "steps": 4,
-        "depends_on_workflow": "Domain Architecture",
-    },
+CAPABILITIES = [
+    # Commerce
+    {"name": "Order Management",    "level": "L1", "parent": None,
+     "description": "Enterprise capability to manage the full lifecycle of customer orders from creation to fulfilment."},
+    {"name": "Order Processing",    "level": "L2", "parent": "Order Management",
+     "description": "Validates, prices, and routes incoming orders before committing them to fulfilment."},
+    {"name": "Order Validation",    "level": "L3", "parent": "Order Processing",
+     "description": "Checks order completeness, stock availability, and customer eligibility before acceptance."},
+    # Payments
+    {"name": "Payment Management",  "level": "L1", "parent": None,
+     "description": "Enterprise capability to authorise, collect, and settle payments across all channels."},
+    {"name": "Payment Authorization","level": "L2", "parent": "Payment Management",
+     "description": "Performs real-time fraud screening and issuer authorisation for each payment attempt."},
+    {"name": "Fraud Detection",     "level": "L3", "parent": "Payment Authorization",
+     "description": "Applies ML-based rules and velocity checks to score and accept or decline transactions."},
+]
+
+DOMAINS = [
+    {"name": "Commerce",  "description": "Covers the customer shopping experience — browsing, cart, checkout, and order tracking."},
+    {"name": "Payments",  "description": "Covers the financial transaction layer — authorisation, clearing, and settlement of funds."},
+]
+
+SUBDOMAINS = [
+    {"name": "Checkout",                "domain": "Commerce",
+     "description": "The point-of-sale subprocess — from cart finalisation through order confirmation."},
+    {"name": "Transaction Processing",  "domain": "Payments",
+     "description": "Real-time processing of payment transactions — authorisation through settlement."},
+]
+
+BOUNDED_CONTEXTS = [
+    # Checkout has TWO bounded contexts — same subdomain, different 'Order' meaning
+    {"name": "Cart Management",    "subdomain": "Checkout",
+     "ubiquitous_language": "Order = customer purchase basket, not yet committed.",
+     "description": "Manages the shopping cart lifecycle: add/remove items, apply promotions, lock cart at checkout start."},
+    {"name": "Order Confirmation", "subdomain": "Checkout",
+     "ubiquitous_language": "Order = confirmed, immutable purchase record with a unique order ID.",
+     "description": "Converts a locked cart into a confirmed order, assigns order ID, triggers fulfilment and payment flows."},
+    # Transaction Processing has TWO bounded contexts
+    {"name": "Authorization",  "subdomain": "Transaction Processing",
+     "ubiquitous_language": "Order = payment instruction sent to the issuer for approval.",
+     "description": "Sends authorisation requests to card networks, applies fraud scores, and returns approve/decline decisions."},
+    {"name": "Settlement",     "subdomain": "Transaction Processing",
+     "ubiquitous_language": "Transaction = settled funds transfer between acquirer and issuer.",
+     "description": "Batches authorised transactions, submits clearing files to networks, and reconciles settled funds."},
 ]
 
 COMPONENTS = [
-    {
-        "name": "Knowledge Ingestion Pipeline",
-        "type": "pipeline",
-        "description": "Five-stage ingestion pipeline (Fetch → Validate → Reconcile identity → Map to ontology → Emit). One instance per source.",
-    },
-    {
-        "name": "S3 Artifact Store",
-        "type": "storage",
-        "description": "Stores raw workflow output artifacts (markdown files). Source of record for all produced documents.",
-    },
-    {
-        "name": "PostgreSQL Event Register",
-        "type": "database",
-        "description": "Live register for integration events, personas, and components. Fed by solution repo YAMLs and workflow outputs.",
-    },
+    {"name": "checkout-service",   "type": "service", "context": "Cart Management",
+     "description": "Orchestrates cart validation, promotion application, and checkout initiation. Calls payment gateway before confirming."},
+    {"name": "order-service",      "type": "service", "context": "Order Confirmation",
+     "description": "Persists confirmed orders, assigns order IDs, emits order-submitted events, and exposes order status APIs."},
+    {"name": "auth-gateway",       "type": "gateway", "context": "Authorization",
+     "description": "Routes payment authorisation requests to card networks, applies ML fraud scores, and returns real-time decisions."},
+    {"name": "settlement-service", "type": "service", "context": "Settlement",
+     "description": "Batches daily authorised transactions into clearing files, submits to networks, and reconciles settled amounts."},
 ]
 
 CONTRACTS = [
-    {
-        "name": "solution-concept-output",
-        "interface_type": "document",
-        "description": "Output contract of Discovery — Solution Concept. Required input to Domain Synthesis and Domain Architecture.",
-    },
-    {
-        "name": "domain-synthesis-output",
-        "interface_type": "document-package",
-        "description": "7-artifact output package of Discovery — Domain Synthesis. Enables domain-model-driven mode in Domain Architecture.",
-    },
+    {"name": "order-submitted",          "type": "event",   "component": "order-service",
+     "description": "Event emitted when a customer order is confirmed and persisted. Consumed by payment and fulfilment services."},
+    {"name": "POST /checkout/complete",  "type": "rest",    "component": "checkout-service",
+     "description": "REST endpoint that finalises the cart, triggers payment authorisation, and returns a confirmed order ID."},
+    {"name": "payment-authorized",       "type": "event",   "component": "auth-gateway",
+     "description": "Event emitted when a payment authorisation is approved by the card network. Consumed by order-service to confirm purchase."},
+    {"name": "payment-settled",          "type": "event",   "component": "settlement-service",
+     "description": "Event emitted after funds are cleared and settled between acquirer and issuer."},
+    {"name": "POST /payments/authorize", "type": "rest",    "component": "auth-gateway",
+     "description": "REST endpoint that accepts a payment instruction and returns an authorisation decision synchronously."},
 ]
 
-# ── Relationships ─────────────────────────────────────────────────────────────
-# Defined after nodes so we can reference by name
+# ── Relationships ──────────────────────────────────────────────────────────────
+
+VSTREAM_CAPABILITIES = [
+    ("Digital Sales", "Order Management"),
+    ("Digital Sales", "Payment Management"),
+]
+
+CAPABILITY_HIERARCHY = [
+    ("Order Management",   "Order Processing"),
+    ("Order Processing",   "Order Validation"),
+    ("Payment Management", "Payment Authorization"),
+    ("Payment Authorization", "Fraud Detection"),
+]
+
+CONTEXT_DEPENDENCIES = [
+    # Cart Management calls Authorization before confirming the order
+    ("Cart Management", "Authorization"),
+    # order-service calls auth-gateway (cross-domain)
+    ("order-service",   "auth-gateway"),
+]
 
 
-def build_entity_ids(nodes):
-    """Generate stable UUIDs for all nodes keyed by name."""
-    return {node["name"]: str(uuid.uuid4()) for node in nodes}
+# ── Graph operations ───────────────────────────────────────────────────────────
 
-
-def seed(driver, entity_ids):
+def clear_db(driver):
     with driver.session() as s:
+        s.run("MATCH (n) DETACH DELETE n")
 
-        # Constraints (idempotent)
-        for label in ("Workflow", "Domain", "Component", "Contract"):
+
+def create_constraints(driver):
+    labels = ("ValueStream", "Capability", "Domain", "Subdomain",
+              "BoundedContext", "Component", "Contract")
+    with driver.session() as s:
+        for label in labels:
             s.run(f"CREATE CONSTRAINT IF NOT EXISTS FOR (n:{label}) REQUIRE n.entityId IS UNIQUE")
 
-        # ── Domains ──────────────────────────────────────────────────────────
+
+def seed(driver, ids):
+    with driver.session() as s:
+
+        # ValueStreams
+        for v in VALUE_STREAMS:
+            s.run("MERGE (n:ValueStream {entityId:$eid}) SET n.name=$name, n.description=$desc",
+                  eid=ids[v["name"]], name=v["name"], desc=v["description"])
+
+        # Capabilities
+        for c in CAPABILITIES:
+            s.run("MERGE (n:Capability {entityId:$eid}) SET n.name=$name, n.level=$level, n.description=$desc",
+                  eid=ids[c["name"]], name=c["name"], level=c["level"], desc=c["description"])
+        for parent, child in CAPABILITY_HIERARCHY:
+            s.run("MATCH (p:Capability {name:$p}),(c:Capability {name:$c}) MERGE (p)-[:HAS_CHILD]->(c)",
+                  p=parent, c=child)
+
+        # ValueStream → Capability
+        for vs, cap in VSTREAM_CAPABILITIES:
+            s.run("MATCH (v:ValueStream {name:$v}),(c:Capability {name:$c}) MERGE (v)-[:INVESTS_IN]->(c)",
+                  v=vs, c=cap)
+
+        # Domains
         for d in DOMAINS:
-            s.run(
-                """
-                MERGE (n:Domain {entityId: $eid})
-                SET n.name = $name, n.level = $level, n.description = $description
-                """,
-                eid=entity_ids[d["name"]], **d,
-            )
+            s.run("MERGE (n:Domain {entityId:$eid}) SET n.name=$name, n.description=$desc",
+                  eid=ids[d["name"]], name=d["name"], desc=d["description"])
 
-        # ── Workflows ─────────────────────────────────────────────────────────
-        for w in WORKFLOWS:
-            s.run(
-                """
-                MERGE (n:Workflow {entityId: $eid})
-                SET n.name = $name, n.file = $file, n.purpose = $purpose,
-                    n.steps = $steps
-                """,
-                eid=entity_ids[w["name"]],
-                name=w["name"], file=w["file"],
-                purpose=w["purpose"], steps=w["steps"],
-            )
-            # BELONGS_TO Domain
-            s.run(
-                """
-                MATCH (w:Workflow {entityId: $weid}), (d:Domain {name: $dname})
-                MERGE (w)-[:BELONGS_TO]->(d)
-                """,
-                weid=entity_ids[w["name"]], dname=w["domain"],
-            )
-            # DEPENDS_ON upstream Workflow
-            if "depends_on_workflow" in w:
-                s.run(
-                    """
-                    MATCH (w:Workflow {entityId: $weid}),
-                          (up:Workflow {name: $upname})
-                    MERGE (w)-[:DEPENDS_ON]->(up)
-                    """,
-                    weid=entity_ids[w["name"]], upname=w["depends_on_workflow"],
-                )
+        # Subdomains + CONTAINS edges
+        for sd in SUBDOMAINS:
+            s.run("MERGE (n:Subdomain {entityId:$eid}) SET n.name=$name, n.description=$desc",
+                  eid=ids[sd["name"]], name=sd["name"], desc=sd["description"])
+            s.run("MATCH (d:Domain {name:$dn}),(sd:Subdomain {name:$sn}) MERGE (d)-[:CONTAINS]->(sd)",
+                  dn=sd["domain"], sn=sd["name"])
 
-        # ── Components ────────────────────────────────────────────────────────
-        for c in COMPONENTS:
-            s.run(
-                """
-                MERGE (n:Component {entityId: $eid})
-                SET n.name = $name, n.type = $type, n.description = $description
-                """,
-                eid=entity_ids[c["name"]], **c,
-            )
+        # BoundedContexts + CONTAINS edges
+        for bc in BOUNDED_CONTEXTS:
+            s.run("""MERGE (n:BoundedContext {entityId:$eid})
+                     SET n.name=$name, n.ubiquitous_language=$ul, n.description=$desc""",
+                  eid=ids[bc["name"]], name=bc["name"],
+                  ul=bc["ubiquitous_language"], desc=bc["description"])
+            s.run("MATCH (sd:Subdomain {name:$sn}),(bc:BoundedContext {name:$bn}) MERGE (sd)-[:CONTAINS]->(bc)",
+                  sn=bc["subdomain"], bn=bc["name"])
 
-        # ── Contracts ─────────────────────────────────────────────────────────
+        # BoundedContext DEPENDS_ON BoundedContext
+        for src, tgt in CONTEXT_DEPENDENCIES:
+            if src in [bc["name"] for bc in BOUNDED_CONTEXTS]:
+                s.run("MATCH (a:BoundedContext {name:$a}),(b:BoundedContext {name:$b}) MERGE (a)-[:DEPENDS_ON]->(b)",
+                      a=src, b=tgt)
+
+        # Components + IMPLEMENTS edges
+        for comp in COMPONENTS:
+            s.run("MERGE (n:Component {entityId:$eid}) SET n.name=$name, n.type=$type, n.description=$desc",
+                  eid=ids[comp["name"]], name=comp["name"], type=comp["type"], desc=comp["description"])
+            s.run("MATCH (c:Component {name:$cn}),(bc:BoundedContext {name:$bn}) MERGE (c)-[:IMPLEMENTS]->(bc)",
+                  cn=comp["name"], bn=comp["context"])
+
+        # Component DEPENDS_ON Component
+        for src, tgt in CONTEXT_DEPENDENCIES:
+            if src in [c["name"] for c in COMPONENTS]:
+                s.run("MATCH (a:Component {name:$a}),(b:Component {name:$b}) MERGE (a)-[:DEPENDS_ON]->(b)",
+                      a=src, b=tgt)
+
+        # Contracts + EXPOSES edges
         for ct in CONTRACTS:
-            s.run(
-                """
-                MERGE (n:Contract {entityId: $eid})
-                SET n.name = $name, n.interface_type = $interface_type,
-                    n.description = $description
-                """,
-                eid=entity_ids[ct["name"]], **ct,
-            )
-
-        # ── Cross-entity relationships ────────────────────────────────────────
-
-        # Workflows DEPENDS_ON S3 (they read/write artifacts there)
-        for wf_name in [w["name"] for w in WORKFLOWS]:
-            s.run(
-                """
-                MATCH (w:Workflow {entityId: $weid}),
-                      (c:Component {name: 'S3 Artifact Store'})
-                MERGE (w)-[:DEPENDS_ON]->(c)
-                """,
-                weid=entity_ids[wf_name],
-            )
-
-        # Domain Synthesis DEPENDS_ON PostgreSQL Event Register (outputs integration events)
-        s.run(
-            """
-            MATCH (w:Workflow {name: 'Discovery — Domain Synthesis'}),
-                  (c:Component {name: 'PostgreSQL Event Register'})
-            MERGE (w)-[:DEPENDS_ON]->(c)
-            """,
-        )
-
-        # Knowledge Ingestion Pipeline IMPLEMENTS solution-concept-output contract
-        s.run(
-            """
-            MATCH (c:Component {name: 'Knowledge Ingestion Pipeline'}),
-                  (ct:Contract {name: 'solution-concept-output'})
-            MERGE (c)-[:IMPLEMENTS]->(ct)
-            """,
-        )
-
-        # S3 Artifact Store IMPLEMENTS domain-synthesis-output contract
-        s.run(
-            """
-            MATCH (c:Component {name: 'S3 Artifact Store'}),
-                  (ct:Contract {name: 'domain-synthesis-output'})
-            MERGE (c)-[:IMPLEMENTS]->(ct)
-            """,
-        )
+            s.run("""MERGE (n:Contract {entityId:$eid})
+                     SET n.name=$name, n.type=$type, n.description=$desc""",
+                  eid=ids[ct["name"]], name=ct["name"], type=ct["type"], desc=ct["description"])
+            s.run("MATCH (c:Component {name:$cn}),(ct:Contract {name:$ctn}) MERGE (c)-[:EXPOSES]->(ct)",
+                  cn=ct["component"], ctn=ct["name"])
 
 
 def verify(driver):
     with driver.session() as s:
-        counts = {}
-        for label in ("Workflow", "Domain", "Component", "Contract"):
-            result = s.run(f"MATCH (n:{label}) RETURN count(n) AS c")
-            counts[label] = result.single()["c"]
-
-        rel_result = s.run("MATCH ()-[r]->() RETURN type(r) AS t, count(r) AS c")
-        rels = {row["t"]: row["c"] for row in rel_result}
-
-        print("\nNode counts:")
-        for label, count in counts.items():
-            print(f"  {label}: {count}")
-        print("\nRelationship counts:")
-        for rel, count in rels.items():
-            print(f"  {rel}: {count}")
-
-        # Spot-check query from spec
-        check = s.run(
-            "MATCH (w:Workflow)-[:BELONGS_TO]->(d:Domain) RETURN w.name, d.name ORDER BY d.name, w.name"
-        )
-        print("\nWorkflow → Domain (spec check query):")
-        for row in check:
-            print(f"  {row['w.name']} → {row['d.name']}")
+        for label in ("ValueStream","Capability","Domain","Subdomain","BoundedContext","Component","Contract"):
+            r = s.run(f"MATCH (n:{label}) RETURN count(n) AS c").single()
+            print(f"  {label}: {r['c']}")
+        rels = s.run("MATCH ()-[r]->() RETURN type(r) AS t, count(r) AS c ORDER BY c DESC")
+        print("\nRelationships:")
+        for row in rels:
+            print(f"  {row['t']}: {row['c']}")
 
 
 if __name__ == "__main__":
-    # Build and persist entity IDs
-    all_nodes = DOMAINS + WORKFLOWS + COMPONENTS + CONTRACTS
+    all_nodes = VALUE_STREAMS + CAPABILITIES + DOMAINS + SUBDOMAINS + BOUNDED_CONTEXTS + COMPONENTS + CONTRACTS
     ENTITY_IDS_PATH.parent.mkdir(parents=True, exist_ok=True)
 
-    if ENTITY_IDS_PATH.exists():
-        entity_ids = json.loads(ENTITY_IDS_PATH.read_text())
-        # Add any new nodes not yet in the file
-        for node in all_nodes:
-            if node["name"] not in entity_ids:
-                entity_ids[node["name"]] = str(uuid.uuid4())
-    else:
-        entity_ids = build_entity_ids(all_nodes)
-
-    ENTITY_IDS_PATH.write_text(json.dumps(entity_ids, indent=2))
-    print(f"Entity IDs saved → {ENTITY_IDS_PATH}")
+    # Always regenerate IDs for a clean reseed
+    ids = {n["name"]: str(uuid.uuid4()) for n in all_nodes}
+    ENTITY_IDS_PATH.write_text(json.dumps(ids, indent=2))
+    print(f"Entity IDs saved → {ENTITY_IDS_PATH}\n")
 
     driver = GraphDatabase.driver(URI, auth=AUTH)
-    seed(driver, entity_ids)
+    print("Clearing existing graph...")
+    clear_db(driver)
+    create_constraints(driver)
+    print("Seeding...")
+    seed(driver, ids)
+    print("\nNode counts:")
     verify(driver)
     driver.close()
-    print("\nT2 done — Neo4j seeded.")
+    print("\nSeed complete.")
