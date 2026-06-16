@@ -1,0 +1,64 @@
+schema-version = "0.3"
+
+[pack.core]
+installed-version = "0.4.9"
+source = "agent-ready-repo"
+install-route = "cli"
+scope = "repo"
+primitives = ["skill", "agent", "hook-body", "hook-wiring", "command"]
+
+[pack.core.files]
+".claude/agents/adversarial-reviewer.md" = { from-pack-version = "0.4.9", sha = "d48c8642b00b29de64a208f04f6439854ffcac4c6f1cc2ad1f3967d1c6ef746f" }
+".claude/agents/implementer.md" = { from-pack-version = "0.4.9", sha = "3f64f560c4856948a711af50f1b860c3a7a5a548f9f09193d977d3247d5c182f" }
+".claude/agents/quality-engineer.md" = { from-pack-version = "0.4.9", sha = "4ac555e0da2658810870463c624e9ec0a97a2ea90bb3f0b7cd662b1a37df0d94" }
+".claude/agents/security-reviewer.md" = { from-pack-version = "0.4.9", sha = "ef496ef9b326d27a2e2a02a24b983afe567b74aa85e53041d72ae3a286e9bf37" }
+".claude/commands/conventions-check.md" = { from-pack-version = "0.4.9", sha = "3ceeef1a68f0a75faa8fad7d08a35f0f3262ce3df463ecac362594f578060946" }
+".claude/settings.local.json" = { from-pack-version = "0.4.9", sha = "24756cf47195bbd0ca172f1d4bd47dac74e44310081248f6fc33a0d280e51a3b" }
+".claude/skills/adapt-to-project/SKILL.md" = { from-pack-version = "0.4.9", sha = "116cfe06bbf8d51786fe466d6e4fd6eff4b14100d49fe6f1794e1de75600eb9f" }
+".claude/skills/adapt-to-project/assets/reference.md" = { from-pack-version = "0.4.9", sha = "9ded319b9233531d06f7aa5d4f8bb4b673dea44424c2909eb367ba40853aa799" }
+".claude/skills/bug-fix/SKILL.md" = { from-pack-version = "0.4.9", sha = "be69306996ca67dfbb2266f1d7b769a4988c3b7eb203a478b56ce29f950a3a13" }
+".claude/skills/init-project/SKILL.md" = { from-pack-version = "0.4.9", sha = "6dab88e9e7f32cfb1fd0408af78250a76a17200fa0fb879c4850b104fb8684cf" }
+".claude/skills/new-spec/SKILL.md" = { from-pack-version = "0.4.9", sha = "8bc15986d5f6704827aef7c3d584a560dc9eaf49cb96fa0594521760b01e1e6d" }
+".claude/skills/new-spec/assets/plan.md" = { from-pack-version = "0.4.9", sha = "61af651a2df940030dc8d28d30c0cf994eb55452999c9ba85c8069a4934731ed" }
+".claude/skills/new-spec/assets/spec.md" = { from-pack-version = "0.4.9", sha = "d1238dac8a2db8701b7f7634a784ddeb1acbfa1f281c88d8751ef249c2e656e5" }
+".claude/skills/new-spec/references/contract-types.md" = { from-pack-version = "0.4.9", sha = "b507d39401f4d87c7a6134d90b03c6c30b47aac7ccc8353723e7466c51011b44" }
+".claude/skills/receive-brief/SKILL.md" = { from-pack-version = "0.4.9", sha = "28584ff83da7854aedadf8a91cc56cc98aa14b6f70bb80aafd1cf8751914a33e" }
+".claude/skills/receive-brief/examples/shape-a-outcome-brief.md" = { from-pack-version = "0.4.9", sha = "e37651a71697dc6a2b6cc3468d9f04245dc6ba6d8c2028c461f25ac2b1c31857" }
+".claude/skills/receive-brief/examples/shape-b-story-list-brief.md" = { from-pack-version = "0.4.9", sha = "4479b51b884cdb04eaef404f71527a1b0a0e51210a599b078051ceda8ff8d1f4" }
+".claude/skills/receive-brief/scripts/lint-brief-coverage.py" = { from-pack-version = "0.4.9", sha = "9224ed877885257f9a6b7f25b996fc10bc44f3c22a9e810a20bfe8d74b820c53" }
+".claude/skills/receive-brief/scripts/test-lint-brief-coverage.py" = { from-pack-version = "0.4.9", sha = "3304eee31a086332783c0fd5b674211f940ddd148b2830a9393c4b30809c721d" }
+".claude/skills/security-checklists/SKILL.md" = { from-pack-version = "0.4.9", sha = "4f1288ac638e77c96d6d519b6106ae619631ef879a7b12f602531443ac478d70" }
+".claude/skills/security-checklists/references/access-control.md" = { from-pack-version = "0.4.9", sha = "2830dc07695728fa99c361194d1e42df97bc1096310ba27350281c2e5300a0b4" }
+".claude/skills/security-checklists/references/authn-session.md" = { from-pack-version = "0.4.9", sha = "27bcf6da9f9566f136ab7d01fccc749a5beac10fc398764f016070e4397c6d16" }
+".claude/skills/security-checklists/references/config-misconfig.md" = { from-pack-version = "0.4.9", sha = "327404ecdba2a450bd18ef697ae0c65880ef532a17ee63c4250f3fc73ea624f3" }
+".claude/skills/security-checklists/references/exceptional-conditions.md" = { from-pack-version = "0.4.9", sha = "94d81ae80ebbfa6c7d98b0fe5f2b9d9d227e6b07b3ef6a0f7f4b231618e7924b" }
+".claude/skills/security-checklists/references/injection.md" = { from-pack-version = "0.4.9", sha = "b1cc50272fe8d0becc8dee3f09d939d5d9fd33e01a6362485548d137407a3aca" }
+".claude/skills/security-checklists/references/llm-agent.md" = { from-pack-version = "0.4.9", sha = "a383a74fe69ca117baa80cc3a2d4af6b53ece9c3fc554e7e53baae1c75f6b43f" }
+".claude/skills/security-checklists/references/outbound-ssrf.md" = { from-pack-version = "0.4.9", sha = "b72221fca022c85862c0ec69bb3920d6961bc5261abb62107e015d095e111a3f" }
+".claude/skills/security-checklists/references/path-and-file.md" = { from-pack-version = "0.4.9", sha = "83f51a5a67f055f291ea8be3d62a8c7cc4860c4f8cfb655c56f3d9b2f7eabddf" }
+".claude/skills/security-checklists/references/secrets-and-crypto.md" = { from-pack-version = "0.4.9", sha = "83a56a26d9cc6311c7a815c39415e62748267276583bdae886f4bfdcc7e4bb6f" }
+".claude/skills/security-checklists/references/supply-chain.md" = { from-pack-version = "0.4.9", sha = "ab507316f68ad0049b6a30a1b76996172704114fbf5cefdd38aac5e8cfb99a69" }
+".claude/skills/work-loop/SKILL.md" = { from-pack-version = "0.4.9", sha = "b8c03c435c8b54b5d1ec17ca99a1c14b9e5a137baa91b3191b259379dc6e105e" }
+".claude/skills/work-loop/assets/state.json" = { from-pack-version = "0.4.9", sha = "2febc260ebd783bb6ae2adcab1a75e56487055ebeb82c6cd00b3417f26bc0dd4" }
+".claude/skills/work-loop/references/scale-with-a-tool.md" = { from-pack-version = "0.4.9", sha = "b5785d8711c5fcb64b92779abc7f4331b7a5673bd7e9c18e129e4346402fcc7d" }
+".claude/skills/work-loop/references/state-schema.md" = { from-pack-version = "0.4.9", sha = "90b74df8edb72b33561d08599f205983bffd30553a91c7d8aec9aa36b9b77a81" }
+".claude/skills/work-loop/references/supervisor-mode.md" = { from-pack-version = "0.4.9", sha = "aa26f8a74dab51b7bc8302cdc82ae6bd6ccc21df964289236d7f831141f21702" }
+".claude/skills/work-loop/references/tdd-stubs.md" = { from-pack-version = "0.4.9", sha = "f7dcf9b91417114d7904f8e26a30f8a95117d12018fd8c35fac93fea9a12564a" }
+".claude/skills/work-loop/scripts/lint-spec-status.py" = { from-pack-version = "0.4.9", sha = "0c14071efea14a822dd7b55a6c2e6555439445fd84307b1883744bf62a53bb7b" }
+".claude/skills/work-loop/scripts/loop-cohort.py" = { from-pack-version = "0.4.9", sha = "96a9994a348af6ad3f2098b1deace2a747fa0a2a443c344d72ffb7cc1782fcdb" }
+".claude/skills/work-loop/scripts/test-lint-spec-status.py" = { from-pack-version = "0.4.9", sha = "7799281871fd3de9d58b0754943e327467b14940de5a45090b71f521f8bb85a0" }
+".gitignore" = { from-pack-version = "0.4.9", sha = "5b452f6be7f3a562e7245c717d415c21ec0886cfdb30f718f5ad0f051e363332" }
+"AGENTS.md" = { from-pack-version = "0.4.9", sha = "494dcc76f01f941a8c324e8eb093ac4c0afd903c7ad039b900a94fce6b65ef80" }
+"docs/CHARTER.md" = { from-pack-version = "0.4.9", sha = "13849d4359067e4f7fda0c492f5ce1550741ea97140a858f2b90194341e43b3a" }
+"docs/CONVENTIONS.md" = { from-pack-version = "0.4.9", sha = "1ecdcad7bfcde50fc52e63695d12fd1f817b5641c631262b77c5ba7207fdd7a7" }
+"docs/architecture/README.md" = { from-pack-version = "0.4.9", sha = "a7e28e5163e851cd5f464e7eccc9038c7a97b574eb3bb1822de542be0ea111c6" }
+"docs/architecture/overview.md" = { from-pack-version = "0.4.9", sha = "2f1b4c5b74ee1c6a4899a092945ae367c8985b83234fad7b98de49019df7c04f" }
+"docs/backlog.md" = { from-pack-version = "0.4.9", sha = "ed7796b2ec3c771c2dc186c3a4654b09342470467121cad58265b17773e782e4" }
+"docs/knowledge/README.md" = { from-pack-version = "0.4.9", sha = "689a6ae8db0d9bb5c4f8723f88cff856c84b2ae96da786add941fc71903845d1" }
+"docs/knowledge/patterns.jsonl" = { from-pack-version = "0.4.9", sha = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" }
+"docs/product/README.md" = { from-pack-version = "0.4.9", sha = "c7a814fe47074b7cec0b503331e1722ff8710bcf3d2b88a683357d6aab5adebd" }
+"docs/product/changelog.md" = { from-pack-version = "0.4.9", sha = "33174e36eb083b7d34b440d1968ac378ed4d0f16df57218db543eec352571c7a" }
+"docs/product/roadmap.md" = { from-pack-version = "0.4.9", sha = "d4e08bef6e6385bf537c0dc194a34515d71d97dfa8249db8127af79bb523fa48" }
+"docs/specs/README.md" = { from-pack-version = "0.4.9", sha = "4c2e8dfa29257017ce99d98853dbbf0c6067288d90d66ea26afed42d7e169b19" }
+"tools/hooks/pre-pr.py" = { from-pack-version = "0.4.9", sha = "454c9e7569c469366bbcae169d76a11a7318b416f03f44a4f97f7bc75e69218f" }
+"tools/hooks/session-start.py" = { from-pack-version = "0.4.9", sha = "7b8f7cea36c299a5e95cd6b7b921584a923c8fc2ca0ef1392a5af0af65275148" }

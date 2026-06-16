@@ -1,0 +1,13 @@
+{
+  "Discovery": "e486d074-95d2-40c1-8d7e-3596c8cf1bad",
+  "Architecture": "a9d87520-1c3d-42bf-8051-72e0353b629a",
+  "Discovery \u2014 Solution Concept": "cf51af0a-e543-4680-a8fc-f98f6c79791e",
+  "Discovery \u2014 Domain Synthesis": "3b739914-3c04-4986-b34c-d560b2976a68",
+  "Domain Architecture": "913dfe46-608d-444a-8357-424831e290f6",
+  "Architecture Blueprint Compilation": "2b594627-2b8d-49ad-a9ce-2e8d319c58b3",
+  "Knowledge Ingestion Pipeline": "427fa0db-c423-4dda-b2c9-c0f9c66d53d1",
+  "S3 Artifact Store": "9bae5909-4b4c-45fe-b134-f1d09a805ccb",
+  "PostgreSQL Event Register": "73f1ee1c-e599-41ed-963d-2cb058a87d46",
+  "solution-concept-output": "64a5e86f-25f0-4515-9cdb-90f18aae1bd5",
+  "domain-synthesis-output": "d8e60724-512e-44a7-bfb4-cb11011364d6"
+}
