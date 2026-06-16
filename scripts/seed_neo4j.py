@@ -1,4 +1,4 @@
-"""T2 — Define schema and seed Neo4j with entities from ai-workflow-entity-inventory."""
+"""T2 — Define schema and seed Neo4j with enterprise architecture workflow entities."""
 import json
 import uuid
 from pathlib import Path
@@ -9,7 +9,7 @@ AUTH = ("neo4j", "ukpneo4j2026")
 ENTITY_IDS_PATH = Path(__file__).parent.parent / "data" / "entity_ids.json"
 
 
-# ── Seed data (extracted from ai-workflow-entity-inventory.md) ──────────────
+# ── Seed data — enterprise architecture workflow entities ─────────────────────
 
 DOMAINS = [
     {

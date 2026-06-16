@@ -18,10 +18,10 @@ the bridge explicitly in T4 before building the semantic-first script in T6.
 
 ## Constraints
 
-- Follows ADR-4 scope: validates retrieval architecture patterns for transfer to
+- Follows retrieval architecture decision scope: validates retrieval architecture patterns for transfer to
   Neptune + OpenSearch production design
-- Node types and relationship names must match `[[metamodel-spec]]`
-- No AWS, no CE-KB live connections (spec Boundaries)
+- Node types and relationship names must match `the graph schema spec`
+- No AWS, no live external connections (spec Boundaries)
 
 ## Construction tests
 
@@ -33,7 +33,7 @@ across LanceDB → `entityId` resolution → Neo4j traversal — runs as a singl
   relationships are correct
 - After T4: print top-3 LanceDB results for a test query and verify `entityId` fields
   match Neo4j node IDs
-- After T7: findings doc reviewed against ADR-4 questions before marking POC done
+- After T7: findings doc reviewed against retrieval architecture decision questions before marking POC done
 
 ## Design (LLD)
 
@@ -43,10 +43,10 @@ across LanceDB → `entityId` resolution → Neo4j traversal — runs as a singl
 
 | Label | Key properties | Source |
 |---|---|---|
-| `Workflow` | `entityId`, `name`, `purpose`, `domain` | ai-workflow-entity-inventory |
-| `Domain` | `entityId`, `name`, `level` (L0/L1) | ai-workflow-entity-inventory |
-| `Component` | `entityId`, `name`, `type` | ai-workflow-entity-inventory |
-| `Contract` | `entityId`, `name`, `interface_type` | ai-workflow-entity-inventory |
+| `Workflow` | `entityId`, `name`, `purpose`, `domain` | enterprise workflow entity inventory |
+| `Domain` | `entityId`, `name`, `level` (L0/L1) | enterprise workflow entity inventory |
+| `Component` | `entityId`, `name`, `type` | enterprise workflow entity inventory |
+| `Contract` | `entityId`, `name`, `interface_type` | enterprise workflow entity inventory |
 
 **Neo4j relationship types (minimum viable):**
 
@@ -102,7 +102,7 @@ the bridge key that resolves to a Neo4j node.
 
 **Approach:**
 - Create `scripts/seed_neo4j.py`
-- Extract 5–10 entities manually from `ai-workflow-entity-inventory.md`
+- Extract 5–10 entities manually from `enterprise workflow entity inventory.md`
   (Workflows 1–3 are enough: Solution Concept, Domain Synthesis, one more)
 - Use the `neo4j` Python driver to run `MERGE` Cypher statements for each node
   and relationship
@@ -181,23 +181,23 @@ Neo4j nodes.
 
 ---
 
-### T6: Write findings and answer ADR-4 questions
+### T6: Write findings and answer retrieval architecture decision questions
 
 **Depends on:** T4, T5
 
 **Tests:**
 - `docs/findings.md` contains entries for both patterns
-- Each ADR-4 question has a written answer (even if "needs more investigation")
+- Each retrieval architecture decision question has a written answer (even if "needs more investigation")
 
 **Approach:**
 - Run both scripts against 3 representative queries; record results
 - Fill `docs/findings.md` with:
   - Graph-first: best for, worst for, Cypher complexity, result quality
   - Semantic-first: best for, worst for, bridge reliability, result quality
-  - ADR-4 answers: routing recommendation, intent router need, observed trade-offs
-- Send findings summary to Eugene via Teams
+  - retrieval architecture decision answers: routing recommendation, intent router need, observed trade-offs
+- Share findings summary with the architecture team
 
-**Done when:** all three ADR-4 questions answered in `docs/findings.md`.
+**Done when:** all three retrieval architecture decision questions answered in `docs/findings.md`.
 
 ---
 

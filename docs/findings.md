@@ -1,9 +1,9 @@
 # Retrieval Architecture Findings
 
-> Feeds into: ADR-4 (retrieval architecture) in `[[ukp-architecture-2026-06-16]]`
+> Purpose: inform the retrieval architecture decision (hybrid routing — graph-first vs semantic-first)
 > POC date: 2026-06-15
 > Stack: Neo4j 2026.05.0 (local) + LanceDB 0.33.0 + sentence-transformers all-MiniLM-L6-v2
-> Seed data: 11 entities from `ai-workflow-entity-inventory` (4 Workflows, 2 Domains, 3 Components, 2 Contracts)
+> Seed data: 11 entities from the enterprise workflow entity inventory (4 Workflows, 2 Domains, 3 Components, 2 Contracts)
 
 ---
 
@@ -76,9 +76,9 @@ nodes; (4) hop to direct neighbors; (5) return combined result.
 
 ---
 
-## ADR-4 answers
+## retrieval architecture decision answers
 
-### Q1: Which pattern is more natural for the UKP's primary consumer queries?
+### Q1: Which pattern is more natural for the platform's primary consumer queries?
 
 **Neither alone — the right answer is hybrid, routed by query shape.**
 
@@ -151,7 +151,7 @@ decision in the architecture doc (Section 5.2).
    (all-MiniLM-L6-v2, 384 dims). OpenSearch's embedding pipeline should use the same
    composite text field strategy.
 
-5. **ADR-4 routing recommendation:** implement semantic-first as the default entry
+5. **retrieval architecture decision routing recommendation:** implement semantic-first as the default entry
    point with a lightweight query-shape classifier that promotes to graph-first when
    the query names a known entity + relationship. Build the classifier as a separate
    layer in the MCP, not inside the retrieval scripts.
