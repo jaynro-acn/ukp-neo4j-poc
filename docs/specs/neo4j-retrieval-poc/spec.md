@@ -16,7 +16,12 @@
 A local proof-of-concept that validates a hybrid graph + vector retrieval architecture
 before committing to a production stack (Neptune + OpenSearch). The prototype runs Neo4j
 (local, Homebrew) as the graph store and LanceDB (embedded) as the vector store, seeded
-with enterprise architecture workflow entities.
+with a two-domain enterprise architecture knowledge graph (Commerce + Payments).
+
+The seed data models the full production node hierarchy: ValueStream → Capability
+(L1/L2/L3) → Domain → Subdomain → BoundedContext → Component → Contract. It includes
+an intentional ubiquitous language conflict ("Order" means different things in Commerce
+vs Payments) to test semantic disambiguation.
 
 Success means: two working retrieval scripts — one graph-first, one semantic-first —
 both returning correct results from the same seed data, with findings documented that
@@ -30,18 +35,19 @@ connections.
 
 ### Always do
 
-- Use the defined entity types and relationship names from the graph schema
-  when defining the Neo4j schema — nodes and edges must match the production model
-- Seed from the static entity inventory only (no live connections)
+- Use the 7 defined node types: `ValueStream`, `Capability`, `Domain`, `Subdomain`,
+  `BoundedContext`, `Component`, `Contract`
+- Use the 6 defined relationship types: `INVESTS_IN`, `HAS_CHILD`, `CONTAINS`,
+  `IMPLEMENTS`, `DEPENDS_ON`, `EXPOSES`
+- Embed `name + description` together (not name alone) for richer semantic vectors
 - Document findings after each retrieval pattern in `docs/findings.md`
 - Keep all scripts self-contained and runnable with `python3 <script>.py`
 
 ### Ask first
 
-- Any deviation from the defined node types or relationship names (e.g.
-  adding a node type not in the schema)
-- Changing the seed data beyond the 5–10 entities agreed at spec time
-- Adding a dependency beyond: `neo4j` (driver), `lancedb`, `sentence-transformers`
+- Adding a node type or relationship type not in the schema above
+- Changing the domain model beyond the two agreed domains (Commerce, Payments)
+- Adding a dependency beyond: `neo4j` (driver), `lancedb`, `sentence-transformers`, `pyarrow`
 
 ### Never do
 
@@ -56,43 +62,44 @@ connections.
 - **Goal-based check** — each retrieval script is verified by running it and inspecting
   the output: correct node types returned, correct relationships traversed, `entityId`
   bridge between LanceDB and Neo4j resolves correctly
-- **Manual QA** — findings document reviewed against the retrieval architecture decision open questions; the POC
-  is "done" when each retrieval architecture decision question has a documented answer (even if the answer is
-  "needs more investigation")
+- **Disambiguation check** — the query `"what handles an order?"` must return results
+  from both the Commerce and Payments domains, confirming the ubiquitous language
+  conflict is detectable via semantic search
+- **Manual QA** — findings document reviewed against the retrieval architecture decision
+  open questions; the POC is "done" when each question has a documented answer
 
 No TDD — this is a spike/POC; the scripts are throwaway validation tools, not
 production code.
 
 ## Acceptance Criteria
 
-- [ ] Neo4j running locally via Homebrew; schema loaded with at least 4 node types
-  (`Workflow`, `Domain`, `Component`, `Contract`) and 3 relationship types
-  (`BELONGS_TO`, `DEPENDS_ON`, `IMPLEMENTS`)
-- [ ] LanceDB loaded with vector embeddings of the same 5–10 seed entities;
-  each document carries an `entityId` field matching its Neo4j node
-- [ ] **Graph-first script:** given an entity type + relationship filter (e.g.
-  "all Components that IMPLEMENT a Workflow in domain X"), the script traverses
-  Neo4j and returns the correct nodes with their properties
-- [ ] **Semantic-first script:** given a natural language query, the script (1)
-  retrieves the top-k matching documents from LanceDB, (2) resolves their `entityId`s
-  to Neo4j nodes, (3) hops to related nodes via graph traversal, and (4) returns a
-  combined result
-- [ ] Both scripts run against the same seed data and produce non-empty, correct results
-- [ ] `docs/findings.md` answers the three retrieval architecture decision questions:
-  - Which pattern (graph-first / semantic-first) is more natural for the platform's
-    primary consumer queries?
-  - Is an intent routing layer needed, or can the consumer choose the pattern?
-  - What are the trade-offs observed (speed, result quality, query complexity)?
+- [x] Neo4j running locally via Homebrew; schema loaded with 7 node types and
+  6 relationship types (see Boundaries)
+- [x] 24 entities seeded: 1 ValueStream, 6 Capabilities, 2 Domains, 2 Subdomains,
+  4 BoundedContexts, 4 Components, 5 Contracts
+- [x] One subdomain (Checkout) contains 2 bounded contexts with different ubiquitous
+  language definitions for "Order"
+- [x] Cross-domain dependency: `order-service` → `auth-gateway` (Commerce → Payments)
+- [x] LanceDB loaded with vector embeddings of all 24 entities; `entityId` bridge
+  to Neo4j verified on every entity
+- [x] **Graph-first script:** given a node label + relationship + target label, the
+  script traverses Neo4j and returns correct nodes with properties and `entityId`s
+- [x] **Semantic-first script:** given a natural language query, (1) searches LanceDB,
+  (2) resolves `entityId`s to Neo4j nodes, (3) hops to neighbors, (4) returns combined
+  result
+- [x] Disambiguation query `"what handles an order?"` returns results from both
+  Commerce and Payments domains in top-3
+- [x] `docs/findings.md` answers the three retrieval architecture questions:
+  - Which pattern is more natural for each consumer type?
+  - Is an intent routing layer needed?
+  - What are the observed trade-offs?
 
 ## Assumptions
 
-- Technical: Python runtime is 3.14.6 (`python3 --version`)
-- Technical: Neo4j provisioned via Homebrew (`brew install neo4j`) (user confirmation 2026-06-15)
-- Technical: Retrieval client = Python scripts using raw `neo4j` driver + `lancedb` (user confirmation 2026-06-15)
-- Technical: LanceDB used as embedded vector store to simulate OpenSearch queries (user confirmation 2026-06-15)
-- Technical: Neo4j driver not yet installed — installed in T1
-- Technical: LanceDB not yet installed — installed in T1
-- Technical: Seed data hardcoded in `scripts/seed_neo4j.py` and `scripts/seed_lancedb.py` — 11 enterprise architecture workflow entities
-- Product: Done = working Cypher queries for both patterns + findings documented (user confirmation 2026-06-15)
-- Product: LanceDB simulates OpenSearch; Neptune is the target production graph engine (user confirmation 2026-06-15)
+- Technical: Python 3.9+ required; tested on 3.14.6
+- Technical: Neo4j provisioned via Homebrew; password configured in `AUTH` var in each script
+- Technical: Retrieval client = Python scripts using raw `neo4j` driver + `lancedb`
+- Technical: LanceDB simulates OpenSearch; Neptune is the target production graph engine
+- Technical: Seed data hardcoded in `scripts/seed_neo4j.py` and `scripts/seed_lancedb.py` — 24 entities across Commerce and Payments domains
+- Product: Done = both retrieval patterns working + findings documented
 - Process: No formal review cadence; personal POC project

@@ -114,12 +114,13 @@ Stack OK
 Run in order:
 
 ```bash
-# 1. Define schema and load entities into Neo4j
-#    Creates: 4 Workflows, 2 Domains, 3 Components, 2 Contracts + relationships
+# 1. Define schema and load the two-domain graph into Neo4j
+#    Creates: 1 ValueStream, 6 Capabilities (L1/L2/L3), 2 Domains, 2 Subdomains,
+#             4 BoundedContexts, 4 Components, 5 Contracts — 24 nodes total
 python3 scripts/seed_neo4j.py
 
-# 2. Embed the same entities into LanceDB
-#    Generates 384-dim vectors and stores them with entityId fields
+# 2. Embed the same 24 entities into LanceDB
+#    Generates 384-dim vectors; runs the disambiguation verification query
 python3 scripts/seed_lancedb.py
 ```
 
@@ -135,12 +136,14 @@ the graph store and the vector store.
 Traverse Neo4j by node label + relationship + target label:
 
 ```bash
-python3 scripts/retrieve_graph_first.py Workflow BELONGS_TO Domain
-python3 scripts/retrieve_graph_first.py Workflow DEPENDS_ON Component
-python3 scripts/retrieve_graph_first.py Component IMPLEMENTS Contract
+# Structural queries
+python3 scripts/retrieve_graph_first.py Subdomain CONTAINS BoundedContext
+python3 scripts/retrieve_graph_first.py Component DEPENDS_ON Component
+python3 scripts/retrieve_graph_first.py Component EXPOSES Contract
+python3 scripts/retrieve_graph_first.py Capability HAS_CHILD Capability
 
-# Filter by a specific starting node name
-python3 scripts/retrieve_graph_first.py Workflow DEPENDS_ON Workflow "Domain Architecture"
+# Filter by a specific node name
+python3 scripts/retrieve_graph_first.py Subdomain CONTAINS BoundedContext "Checkout"
 ```
 
 ### Semantic-first
@@ -148,10 +151,15 @@ python3 scripts/retrieve_graph_first.py Workflow DEPENDS_ON Workflow "Domain Arc
 Natural language query → LanceDB vector search → `entityId` bridge → Neo4j graph hop:
 
 ```bash
-python3 scripts/retrieve_semantic_first.py "discovery workflow for domain synthesis"
-python3 scripts/retrieve_semantic_first.py "what components store architecture artifacts"
-python3 scripts/retrieve_semantic_first.py "integration contracts between workflows" 5
+python3 scripts/retrieve_semantic_first.py "what handles an order?"
+python3 scripts/retrieve_semantic_first.py "how does payment authorisation work?"
+python3 scripts/retrieve_semantic_first.py "which services depend on each other?"
+python3 scripts/retrieve_semantic_first.py "what capabilities does Digital Sales invest in?" 5
 ```
+
+> The first query (`"what handles an order?"`) is the key disambiguation test — it should
+> return results from **both** Commerce and Payments since "Order" means different things
+> in each domain.
 
 The second optional argument sets `top_k` (default: 3).
 
@@ -192,11 +200,34 @@ ukp-neo4j-poc/
 
 ---
 
-## Seed data
+## Domain model
 
-Entities represent 4 software delivery lifecycle workflows and their associated
-domains, components, and contracts — a realistic enterprise architecture knowledge
-graph sample.
+Two domains — **Commerce** and **Payments** — sharing a `Digital Sales` ValueStream.
+
+```
+Digital Sales (ValueStream)
+  ├── INVESTS_IN → Order Management (L1 Capability)
+  │     └── HAS_CHILD → Order Processing (L2)
+  │           └── HAS_CHILD → Order Validation (L3)
+  └── INVESTS_IN → Payment Management (L1 Capability)
+        └── HAS_CHILD → Payment Authorization (L2)
+              └── HAS_CHILD → Fraud Detection (L3)
+
+Commerce (Domain)
+  └── CONTAINS → Checkout (Subdomain)
+        ├── CONTAINS → Cart Management (BoundedContext)  ← "Order" = basket
+        └── CONTAINS → Order Confirmation (BoundedContext) ← "Order" = confirmed record
+
+Payments (Domain)
+  └── CONTAINS → Transaction Processing (Subdomain)
+        ├── CONTAINS → Authorization (BoundedContext) ← "Order" = payment instruction
+        └── CONTAINS → Settlement (BoundedContext)
+
+Cross-domain: order-service ──DEPENDS_ON──▶ auth-gateway
+```
+
+The word **"Order"** has a different meaning in each bounded context — the key
+ubiquitous language conflict for semantic disambiguation testing.
 
 ---
 
