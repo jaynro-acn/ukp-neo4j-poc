@@ -2,8 +2,40 @@
 
 > Purpose: inform the retrieval architecture decision (hybrid routing — graph-first vs semantic-first)
 > POC date: 2026-06-15
-> Stack: Neo4j 2026.05.0 (local) + LanceDB 0.33.0 + sentence-transformers all-MiniLM-L6-v2
+> Stack: Neo4j 2026.05.0 (local) + Qdrant (embedded local mode) + sentence-transformers all-MiniLM-L6-v2
 > Seed data: 11 entities from the enterprise workflow entity inventory (4 Workflows, 2 Domains, 3 Components, 2 Contracts)
+
+---
+
+## Smoke Test Validation (2026-06-16)
+
+Full end-to-end smoke test was executed in the project virtual environment (`.venv312`) after Qdrant migration and Python 3.12 alignment.
+
+**Commands executed:**
+
+- `.venv312/bin/python scripts/verify_stack.py`
+- `.venv312/bin/python scripts/seed_neo4j.py`
+- `.venv312/bin/python scripts/seed_qdrant.py`
+- `.venv312/bin/python scripts/retrieve_graph_first.py ValueStream INVESTS_IN Capability "Digital Sales"`
+- `.venv312/bin/python scripts/retrieve_semantic_first.py "what capabilities does Digital Sales invest in?" 5`
+
+**Observed outcomes:**
+
+- Stack check passed (`neo4j`, `qdrant-client`, `sentence-transformers` all OK)
+- Neo4j seeding completed with expected model counts:
+  - Nodes: ValueStream 1, Capability 6, Domain 2, Subdomain 2, BoundedContext 4, Component 4, Contract 5
+  - Relationships: CONTAINS 6, EXPOSES 5, HAS_CHILD 4, IMPLEMENTS 4, INVESTS_IN 2, DEPENDS_ON 2
+- Qdrant seeding completed with 24 vectors and verification queries returning valid bridge IDs
+- Graph-first retrieval returned the expected 2 edges for `Digital Sales` investing in capabilities:
+  - `Order Management`
+  - `Payment Management`
+- Semantic-first retrieval returned `Digital Sales` and the same two capability nodes in top-5, and graph hop showed the expected INVESTS_IN neighbors
+
+**Compatibility fix validated during smoke:**
+
+- Installed `qdrant-client` version exposes `query_points` (not `search`)
+- Retrieval logic was updated for compatibility, with fallback support where `search` exists
+- Semantic retrieval output remains correct after this adjustment
 
 ---
 
@@ -43,13 +75,13 @@ narrows to a single starting node.
 
 **Script:** `scripts/retrieve_semantic_first.py "<natural language query>" [top_k]`
 
-**How it works:** (1) embed the query with `all-MiniLM-L6-v2`; (2) search LanceDB for
+**How it works:** (1) embed the query with `all-MiniLM-L6-v2`; (2) search Qdrant for
 top-k matching entities by cosine similarity; (3) resolve their `entityId`s to Neo4j
 nodes; (4) hop to direct neighbors; (5) return combined result.
 
 **Queries run:**
 
-| Query | Top-1 LanceDB hit | Graph hop added value? |
+| Query | Top-1 Qdrant hit | Graph hop added value? |
 |---|---|---|
 | "discovery workflow for domain synthesis" | `domain-synthesis-output` (Contract) | Yes — revealed Domain Synthesis's 4 dependencies |
 | "what components store architecture artifacts" | `Architecture` (Domain) | Yes — revealed Blueprint Compilation's dependency chain |
@@ -123,9 +155,9 @@ the caller to pick a pattern. The routing logic lives inside the MCP, not in the
 | Best query type | "What is the structure around X?" | "What is relevant to this topic?" |
 | Multi-hop support | Native (extend Cypher) | Requires repeated hops (not implemented) |
 
-**Key finding:** the `entityId` bridge between LanceDB and Neo4j is the load-bearing
+**Key finding:** the `entityId` bridge between Qdrant and Neo4j is the load-bearing
 seam of the hybrid architecture. It held perfectly across all test runs — every
-LanceDB hit resolved to a valid Neo4j node. This validates the `entityId` design
+Qdrant hit resolved to a valid Neo4j node. This validates the `entityId` design
 decision in the architecture doc (Section 5.2).
 
 ---
@@ -134,7 +166,7 @@ decision in the architecture doc (Section 5.2).
 
 1. **The hybrid pattern transfers directly to Neptune + OpenSearch.** The structural
    finding — semantic entry point → graph traversal — is engine-agnostic. Neptune
-   replaces Neo4j (same Cypher dialect); OpenSearch replaces LanceDB (same vector
+  replaces Neo4j (same Cypher dialect); OpenSearch replaces Qdrant (same vector
    search + `entityId` bridge).
 
 2. **The context MCP should expose one tool, not two.** Route graph-first vs

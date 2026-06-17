@@ -12,7 +12,7 @@
 Six sequential tasks: install the stack, seed the graph, seed the vector store,
 implement both retrieval patterns, and document findings. Each task is a standalone
 script a single session can complete. The riskiest part is the `entityId` bridge
-between LanceDB and Neo4j — if IDs don't match, the semantic-first hop returns nothing.
+between Qdrant and Neo4j — if IDs don't match, the semantic-first hop returns nothing.
 The bridge is validated explicitly in T3 before building the retrieval scripts.
 
 ## Constraints
@@ -24,7 +24,7 @@ The bridge is validated explicitly in T3 before building the retrieval scripts.
 ## Construction tests
 
 **Integration tests:** the semantic-first script (T5) is an end-to-end test across
-LanceDB → `entityId` resolution → Neo4j traversal — runs as a single script.
+Qdrant → `entityId` resolution → Neo4j traversal — runs as a single script.
 
 **Disambiguation test:** query `"what handles an order?"` must return results from
 both Commerce (Order Confirmation / order-service) and Payments (Authorization /
@@ -33,7 +33,7 @@ auth-gateway) domains in top-3. This is the key calibration check.
 **Manual verification:**
 - After T2: inspect Neo4j Browser at `http://localhost:7474` — confirm all 7 node types
   and 6 relationship types are present
-- After T3: run LanceDB verify block — confirm all 24 `entityId`s resolve to Neo4j nodes
+- After T3: run Qdrant verify block — confirm all 24 `entityId`s resolve to Neo4j nodes
 - After T5: run disambiguation query and confirm cross-domain results
 
 ## Design (LLD)
@@ -63,7 +63,7 @@ auth-gateway) domains in top-3. This is the key calibration check.
 | `DEPENDS_ON` | Component→Component, BoundedContext→BoundedContext | runtime dependency |
 | `EXPOSES` | Component → Contract | component publishes this contract |
 
-**LanceDB schema:**
+**Qdrant schema:**
 Each document: `{ entityId, name, type, text, vector }` — `text` = name + description
 (+ ubiquitous_language for BoundedContext nodes). `entityId` is the bridge key.
 
@@ -88,7 +88,7 @@ Each document: `{ entityId, name, type, text, vector }` — `text` = name + desc
 ### T2: Seed Neo4j
 **Done when:** 24 nodes across 7 labels, 23 relationships across 6 types confirmed
 
-### T3: Seed LanceDB
+### T3: Seed Qdrant
 **Done when:** 24 entities embedded; all `entityId`s resolve to Neo4j nodes;
 disambiguation query returns cross-domain results
 
@@ -107,7 +107,7 @@ from both Commerce and Payments in top-3
 
 Local only. No deployment.
 - Stop Neo4j: `brew services stop neo4j`
-- Remove LanceDB data: `rm -rf data/lancedb/`
+- Remove Qdrant data: `rm -rf data/qdrant/`
 - Deactivate venv: `deactivate`
 
 ## Changelog
@@ -116,3 +116,6 @@ Local only. No deployment.
 - 2026-06-16: redesigned to full production node hierarchy (7 node types, 6 rel types);
   Commerce + Payments domains replace workflow-based seed; ubiquitous language conflict
   added for disambiguation testing; 11 → 24 entities
+- 2026-06-16: post-migration smoke test completed end-to-end in `.venv312`; retrieval
+  scripts updated for qdrant-client API compatibility (`query_points` path) and
+  documentation/spec acceptance criteria aligned to validated command sequence

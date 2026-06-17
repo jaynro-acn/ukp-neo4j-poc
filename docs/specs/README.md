@@ -19,7 +19,7 @@ docs/specs/<feature>/
 
 | Spec | Status | Constrained by | Notes |
 | --- | --- | --- | --- |
-| [neo4j-retrieval-poc](neo4j-retrieval-poc/spec.md) | Shipped | ADR-4 | Validates graph-first + semantic-first retrieval patterns locally (Neo4j + LanceDB) |
+| [neo4j-retrieval-poc](neo4j-retrieval-poc/spec.md) | Shipped | ADR-4 | Validates graph-first + semantic-first retrieval patterns locally (Neo4j + Qdrant) |
 
 ## Shipped specs (archived)
 

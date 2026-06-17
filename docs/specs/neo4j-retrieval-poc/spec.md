@@ -15,7 +15,7 @@
 
 A local proof-of-concept that validates a hybrid graph + vector retrieval architecture
 before committing to a production stack (Neptune + OpenSearch). The prototype runs Neo4j
-(local, Homebrew) as the graph store and LanceDB (embedded) as the vector store, seeded
+(local, Homebrew) as the graph store and Qdrant (embedded local mode) as the vector store, seeded
 with a two-domain enterprise architecture knowledge graph (Commerce + Payments).
 
 The seed data models the full production node hierarchy: ValueStream → Capability
@@ -47,7 +47,7 @@ connections.
 
 - Adding a node type or relationship type not in the schema above
 - Changing the domain model beyond the two agreed domains (Commerce, Payments)
-- Adding a dependency beyond: `neo4j` (driver), `lancedb`, `sentence-transformers`, `pyarrow`
+- Adding a dependency beyond: `neo4j` (driver), `qdrant-client`, `sentence-transformers`
 
 ### Never do
 
@@ -55,13 +55,13 @@ connections.
 - Connect to any live external system or repository
 - Write production-grade code (no error handling beyond what's needed to run the scripts)
 - Add a web server, API layer, or any UI
-- Persist data outside the local Neo4j instance and LanceDB files
+- Persist data outside the local Neo4j instance and Qdrant files
 
 ## Testing Strategy
 
 - **Goal-based check** — each retrieval script is verified by running it and inspecting
   the output: correct node types returned, correct relationships traversed, `entityId`
-  bridge between LanceDB and Neo4j resolves correctly
+  bridge between Qdrant and Neo4j resolves correctly
 - **Disambiguation check** — the query `"what handles an order?"` must return results
   from both the Commerce and Payments domains, confirming the ubiquitous language
   conflict is detectable via semantic search
@@ -80,11 +80,11 @@ production code.
 - [x] One subdomain (Checkout) contains 2 bounded contexts with different ubiquitous
   language definitions for "Order"
 - [x] Cross-domain dependency: `order-service` → `auth-gateway` (Commerce → Payments)
-- [x] LanceDB loaded with vector embeddings of all 24 entities; `entityId` bridge
+- [x] Qdrant loaded with vector embeddings of all 24 entities; `entityId` bridge
   to Neo4j verified on every entity
 - [x] **Graph-first script:** given a node label + relationship + target label, the
   script traverses Neo4j and returns correct nodes with properties and `entityId`s
-- [x] **Semantic-first script:** given a natural language query, (1) searches LanceDB,
+- [x] **Semantic-first script:** given a natural language query, (1) searches Qdrant,
   (2) resolves `entityId`s to Neo4j nodes, (3) hops to neighbors, (4) returns combined
   result
 - [x] Disambiguation query `"what handles an order?"` returns results from both
@@ -93,13 +93,22 @@ production code.
   - Which pattern is more natural for each consumer type?
   - Is an intent routing layer needed?
   - What are the observed trade-offs?
+- [x] Full smoke test run succeeds in project Python 3.12 environment:
+  - `verify_stack.py`
+  - `seed_neo4j.py`
+  - `seed_qdrant.py`
+  - `retrieve_graph_first.py ValueStream INVESTS_IN Capability "Digital Sales"`
+  - `retrieve_semantic_first.py "what capabilities does Digital Sales invest in?" 5`
+- [x] Qdrant query path is compatible with installed client API (`query_points`)
+  while preserving support for clients exposing `search`
 
 ## Assumptions
 
-- Technical: Python 3.9+ required; tested on 3.14.6
+- Technical: Python 3.12 required; tested on 3.12.x
 - Technical: Neo4j provisioned via Homebrew; password configured in `AUTH` var in each script
-- Technical: Retrieval client = Python scripts using raw `neo4j` driver + `lancedb`
-- Technical: LanceDB simulates OpenSearch; Neptune is the target production graph engine
-- Technical: Seed data hardcoded in `scripts/seed_neo4j.py` and `scripts/seed_lancedb.py` — 24 entities across Commerce and Payments domains
+- Technical: Retrieval client = Python scripts using raw `neo4j` driver + `qdrant-client`
+- Technical: Qdrant simulates OpenSearch; Neptune is the target production graph engine
+- Technical: Seed data hardcoded in `scripts/seed_neo4j.py` and `scripts/seed_qdrant.py` — 24 entities across Commerce and Payments domains
+- Technical: Qdrant client API may differ by version (`search` vs `query_points`); scripts handle this explicitly
 - Product: Done = both retrieval patterns working + findings documented
 - Process: No formal review cadence; personal POC project

@@ -1,4 +1,4 @@
-# Neo4j + LanceDB Hybrid Retrieval POC
+# Neo4j + Qdrant Hybrid Retrieval POC
 
 Local proof-of-concept validating a **hybrid graph + vector retrieval architecture** —
 graph-first and semantic-first patterns — before committing to a production stack
@@ -13,7 +13,7 @@ graph-first and semantic-first patterns — before committing to a production st
 
 - **Graph-first retrieval** — traverse the graph by node label + relationship type;
   deterministic, zero noise, best for structural questions ("what depends on X?")
-- **Semantic-first retrieval** — embed a natural language query, search LanceDB for
+- **Semantic-first retrieval** — embed a natural language query, search Qdrant for
   top-k matches, resolve their IDs to Neo4j nodes, and hop to neighbors
 - **The `entityId` bridge** — a stable UUID on every node links the vector store and
   the graph store, enabling the hybrid pattern
@@ -27,7 +27,7 @@ graph-first and semantic-first patterns — before committing to a production st
 | Component | This POC | Production target |
 |---|---|---|
 | Graph store | Neo4j (Homebrew) | Amazon Neptune |
-| Vector store | LanceDB (embedded, no server) | Amazon OpenSearch |
+| Vector store | Qdrant (embedded local mode) | Amazon OpenSearch |
 | Embeddings | `all-MiniLM-L6-v2` (sentence-transformers) | OpenSearch embedding pipeline |
 | Language | Python 3.9+ | — |
 
@@ -39,7 +39,7 @@ graph-first and semantic-first patterns — before committing to a production st
 ## Prerequisites
 
 - **macOS** with Homebrew installed (`/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"`)
-- **Python 3.9+** — check with `python3 --version`
+- **Python 3.12** — check with `python3.12 --version`
 - **Java 17+** — required by Neo4j; installed automatically by Homebrew
 
 ---
@@ -56,8 +56,8 @@ cd ukp-neo4j-poc
 ### 2. Create a virtual environment (recommended)
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
+/opt/homebrew/bin/python3.12 -m venv .venv312
+source .venv312/bin/activate
 ```
 
 ### 3. Install Python dependencies
@@ -69,7 +69,7 @@ pip install -r requirements.txt
 Or manually:
 
 ```bash
-pip install neo4j lancedb sentence-transformers pyarrow
+pip install neo4j qdrant-client sentence-transformers
 ```
 
 > The first run downloads the `all-MiniLM-L6-v2` model (~80MB). Requires internet access.
@@ -101,7 +101,7 @@ python3 scripts/verify_stack.py
 Expected output:
 ```
   ✓ neo4j driver: 6.x.x
-  ✓ lancedb: 0.x.x
+  ✓ qdrant: local embedded mode ok
   ✓ sentence-transformers: all-MiniLM-L6-v2 ok (dim=384)
 
 Stack OK
@@ -119,9 +119,9 @@ Run in order:
 #             4 BoundedContexts, 4 Components, 5 Contracts — 24 nodes total
 python3 scripts/seed_neo4j.py
 
-# 2. Embed the same 24 entities into LanceDB
+# 2. Embed the same 24 entities into Qdrant
 #    Generates 384-dim vectors; runs the disambiguation verification query
-python3 scripts/seed_lancedb.py
+python3 scripts/seed_qdrant.py
 ```
 
 Entity IDs are persisted to `data/entity_ids.json` — the stable bridge between
@@ -148,7 +148,7 @@ python3 scripts/retrieve_graph_first.py Subdomain CONTAINS BoundedContext "Check
 
 ### Semantic-first
 
-Natural language query → LanceDB vector search → `entityId` bridge → Neo4j graph hop:
+Natural language query → Qdrant vector search → `entityId` bridge → Neo4j graph hop:
 
 ```bash
 python3 scripts/retrieve_semantic_first.py "what handles an order?"
@@ -162,6 +162,33 @@ python3 scripts/retrieve_semantic_first.py "what capabilities does Digital Sales
 > in each domain.
 
 The second optional argument sets `top_k` (default: 3).
+
+---
+
+## Full Smoke Test
+
+Run this exact sequence to validate the complete local stack and both retrieval patterns:
+
+```bash
+.venv312/bin/python scripts/verify_stack.py
+.venv312/bin/python scripts/seed_neo4j.py
+.venv312/bin/python scripts/seed_qdrant.py
+.venv312/bin/python scripts/retrieve_graph_first.py ValueStream INVESTS_IN Capability "Digital Sales"
+.venv312/bin/python scripts/retrieve_semantic_first.py "what capabilities does Digital Sales invest in?" 5
+```
+
+Expected high-level outcome:
+
+- Stack reports `Stack OK`
+- Neo4j seed completes with 24 nodes
+- Qdrant seed completes with 24 vectors
+- Graph-first returns two `INVESTS_IN` capability edges for `Digital Sales`
+- Semantic-first returns `Digital Sales` plus both capabilities in top-5 and graph hop output
+
+Compatibility note:
+
+- Newer `qdrant-client` versions use `query_points` instead of `search`
+- This repo's scripts are updated to support current clients and keep compatibility behavior
 
 ---
 
@@ -183,11 +210,11 @@ ukp-neo4j-poc/
 ├── scripts/
 │   ├── verify_stack.py            # Step 1 — confirms stack is working
 │   ├── seed_neo4j.py              # Step 2 — loads entities into Neo4j
-│   ├── seed_lancedb.py            # Step 3 — embeds entities into LanceDB
+│   ├── seed_qdrant.py             # Step 3 — embeds entities into Qdrant
 │   ├── retrieve_graph_first.py    # Step 4 — graph-first retrieval
 │   └── retrieve_semantic_first.py # Step 5 — semantic-first retrieval
 ├── data/
-│   └── entity_ids.json            # Stable UUID map (Neo4j ↔ LanceDB bridge)
+│   └── entity_ids.json            # Stable UUID map (Neo4j ↔ Qdrant bridge)
 ├── docs/
 │   ├── findings.md                # Retrieval architecture findings
 │   └── specs/
@@ -201,6 +228,8 @@ ukp-neo4j-poc/
 ---
 
 ## Domain model
+
+See the visual context map in [`docs/architecture/subdomains-bounded-contexts.md`](docs/architecture/subdomains-bounded-contexts.md).
 
 Two domains — **Commerce** and **Payments** — sharing a `Digital Sales` ValueStream.
 
@@ -237,8 +266,8 @@ ubiquitous language conflict for semantic disambiguation testing.
 # Stop Neo4j
 brew services stop neo4j
 
-# Remove LanceDB data (regenerate any time with seed_lancedb.py)
-rm -rf data/lancedb/
+# Remove Qdrant data (regenerate any time with seed_qdrant.py)
+rm -rf data/qdrant/
 
 # Deactivate virtual environment
 deactivate
