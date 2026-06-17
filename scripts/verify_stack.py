@@ -1,4 +1,4 @@
-"""T1 verification — confirms Neo4j, neo4j driver, lancedb, and sentence-transformers are all working."""
+"""T1 verification — confirms Neo4j, neo4j driver, qdrant, and sentence-transformers are all working."""
 import sys
 
 def check_neo4j_driver():
@@ -9,11 +9,21 @@ def check_neo4j_driver():
     driver.close()
     return neo4j.__version__
 
-def check_lancedb():
-    import lancedb
-    import tempfile, os
-    db = lancedb.connect(os.path.join(tempfile.mkdtemp(), "verify_test"))
-    return lancedb.__version__
+def check_qdrant():
+    import tempfile
+    from qdrant_client import QdrantClient
+    from qdrant_client.http.models import Distance, VectorParams
+
+    path = tempfile.mkdtemp(prefix="qdrant_verify_")
+    client = QdrantClient(path=path)
+    if client.collection_exists("verify_test"):
+        client.delete_collection(collection_name="verify_test")
+    client.create_collection(
+        collection_name="verify_test",
+        vectors_config=VectorParams(size=4, distance=Distance.COSINE),
+    )
+    client.delete_collection(collection_name="verify_test")
+    return "local embedded mode ok"
 
 def check_sentence_transformers():
     from sentence_transformers import SentenceTransformer
@@ -24,7 +34,7 @@ def check_sentence_transformers():
 
 checks = [
     ("neo4j driver", check_neo4j_driver),
-    ("lancedb", check_lancedb),
+    ("qdrant", check_qdrant),
     ("sentence-transformers", check_sentence_transformers),
 ]
 

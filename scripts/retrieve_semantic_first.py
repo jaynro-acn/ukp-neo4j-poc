@@ -1,31 +1,56 @@
-"""T5 — Semantic-first retrieval: LanceDB vector search → entityId bridge → Neo4j graph hop."""
+"""T5 — Semantic-first retrieval: Qdrant vector search → entityId bridge → Neo4j graph hop."""
 import json
 import sys
 from pathlib import Path
 
-import lancedb
+from qdrant_client import QdrantClient
 from sentence_transformers import SentenceTransformer
 from neo4j import GraphDatabase
 
 URI          = "bolt://localhost:7687"
 AUTH         = ("neo4j", "ukpneo4j2026")
-LANCEDB_PATH = Path(__file__).parent.parent / "data" / "lancedb"
+QDRANT_PATH  = Path(__file__).parent.parent / "data" / "qdrant"
+COLLECTION_NAME = "entities"
 
 HELP = """
 Usage:
   python3 retrieve_semantic_first.py "<natural language query>" [top_k]
 
 Examples:
-  python3 retrieve_semantic_first.py "discovery workflow for domain synthesis"
-  python3 retrieve_semantic_first.py "what components store architecture artifacts" 3
-  python3 retrieve_semantic_first.py "integration contracts between workflows" 5
+  python3 retrieve_semantic_first.py "what handles an order?"
+  python3 retrieve_semantic_first.py "how does payment authorisation work?" 3
+  python3 retrieve_semantic_first.py "what capabilities does Digital Sales invest in?" 5
 """
 
 
-def vector_search(table, model, query_text, top_k):
+def vector_search(client, model, query_text, top_k):
     vec = model.encode(query_text).tolist()
-    results = table.search(vec).limit(top_k).to_list()
-    return results
+    if hasattr(client, "search"):
+        results = client.search(
+            collection_name=COLLECTION_NAME,
+            query_vector=vec,
+            limit=top_k,
+            with_payload=True,
+        )
+    else:
+        response = client.query_points(
+            collection_name=COLLECTION_NAME,
+            query=vec,
+            limit=top_k,
+            with_payload=True,
+        )
+        results = response.points
+    hits = []
+    for r in results:
+        payload = r.payload or {}
+        hits.append(
+            {
+                "entityId": payload.get("entityId", ""),
+                "name": payload.get("name", ""),
+                "type": payload.get("type", "Unknown"),
+            }
+        )
+    return hits
 
 
 def graph_hop(driver, entity_ids):
@@ -75,16 +100,15 @@ def main():
     query_text = args[0]
     top_k      = int(args[1]) if len(args) > 1 else 3
 
-    # ── Step 1: embed query and search LanceDB ────────────────────────────────
+    # ── Step 1: embed query and search Qdrant ─────────────────────────────────
     print(f"\nQuery: '{query_text}'  (top_k={top_k})")
     print("─" * 60)
 
-    print("\n[1] Semantic search (LanceDB)...")
-    db    = lancedb.connect(str(LANCEDB_PATH))
-    table = db.open_table("entities")
+    print("\n[1] Semantic search (Qdrant)...")
+    client = QdrantClient(path=str(QDRANT_PATH))
     model = SentenceTransformer("all-MiniLM-L6-v2")
 
-    hits = vector_search(table, model, query_text, top_k)
+    hits = vector_search(client, model, query_text, top_k)
 
     print(f"    Top-{top_k} hits:")
     for i, h in enumerate(hits, 1):

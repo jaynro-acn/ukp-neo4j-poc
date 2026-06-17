@@ -1,4 +1,4 @@
-"""Seed LanceDB with embeddings of all graph entities.
+"""Seed Qdrant with embeddings of all graph entities.
 
 Embeds name + description (and ubiquitous_language where present)
 for richer semantic ranking and disambiguation testing.
@@ -6,12 +6,13 @@ for richer semantic ranking and disambiguation testing.
 import json
 from pathlib import Path
 
-import lancedb
-import pyarrow as pa
+from qdrant_client import QdrantClient
+from qdrant_client.http.models import Distance, PointStruct, VectorParams
 from sentence_transformers import SentenceTransformer
 
 ENTITY_IDS_PATH = Path(__file__).parent.parent / "data" / "entity_ids.json"
-LANCEDB_PATH    = Path(__file__).parent.parent / "data" / "lancedb"
+QDRANT_PATH = Path(__file__).parent.parent / "data" / "qdrant"
+COLLECTION_NAME = "entities"
 
 ENTITIES = [
     # ValueStreams
@@ -78,6 +79,24 @@ ENTITIES = [
 ]
 
 
+def vector_search(client, model, query_text, top_k):
+    vec = model.encode(query_text).tolist()
+    if hasattr(client, "search"):
+        return client.search(
+            collection_name=COLLECTION_NAME,
+            query_vector=vec,
+            limit=top_k,
+            with_payload=True,
+        )
+    response = client.query_points(
+        collection_name=COLLECTION_NAME,
+        query=vec,
+        limit=top_k,
+        with_payload=True,
+    )
+    return response.points
+
+
 def main():
     entity_ids = json.loads(ENTITY_IDS_PATH.read_text())
 
@@ -94,38 +113,46 @@ def main():
             raise ValueError(f"entityId missing for '{name}' — run seed_neo4j.py first")
         rows.append({
             "entityId": entity_ids[name],
-            "name":     name,
-            "type":     entity["type"],
-            "text":     entity["text"],
-            "vector":   vector.tolist(),
+            "name": name,
+            "type": entity["type"],
+            "text": entity["text"],
+            "vector": vector.tolist(),
         })
 
-    LANCEDB_PATH.mkdir(parents=True, exist_ok=True)
-    db = lancedb.connect(str(LANCEDB_PATH))
+    QDRANT_PATH.mkdir(parents=True, exist_ok=True)
+    client = QdrantClient(path=str(QDRANT_PATH))
 
-    schema = pa.schema([
-        pa.field("entityId", pa.string()),
-        pa.field("name",     pa.string()),
-        pa.field("type",     pa.string()),
-        pa.field("text",     pa.string()),
-        pa.field("vector",   pa.list_(pa.float32(), 384)),
-    ])
+    if client.collection_exists(COLLECTION_NAME):
+        client.delete_collection(collection_name=COLLECTION_NAME)
+    client.create_collection(
+        collection_name=COLLECTION_NAME,
+        vectors_config=VectorParams(size=384, distance=Distance.COSINE),
+    )
 
-    try:
-        db.drop_table("entities")
-        print("Dropped existing table.")
-    except Exception:
-        pass
+    points = []
+    for idx, row in enumerate(rows):
+        points.append(
+            PointStruct(
+                id=idx + 1,
+                vector=row["vector"],
+                payload={
+                    "entityId": row["entityId"],
+                    "name": row["name"],
+                    "type": row["type"],
+                    "text": row["text"],
+                },
+            )
+        )
 
-    table = db.create_table("entities", data=rows, schema=schema)
-    print(f"\nLanceDB table 'entities' — {table.count_rows()} rows.")
+    client.upsert(collection_name=COLLECTION_NAME, points=points)
+    count = client.count(collection_name=COLLECTION_NAME, exact=True).count
+    print(f"\nQdrant collection '{COLLECTION_NAME}' — {count} rows.")
 
 
 def verify():
     print("\n── Verification ─────────────────────────────────────────────────")
     entity_ids = json.loads(ENTITY_IDS_PATH.read_text())
-    db    = lancedb.connect(str(LANCEDB_PATH))
-    table = db.open_table("entities")
+    client = QdrantClient(path=str(QDRANT_PATH))
     model = SentenceTransformer("all-MiniLM-L6-v2")
 
     queries = [
@@ -135,12 +162,13 @@ def verify():
     ]
 
     for q in queries:
-        vec     = model.encode(q).tolist()
-        results = table.search(vec).limit(3).to_list()
+        results = vector_search(client, model, q, top_k=3)
         print(f"\nQuery: '{q}'")
         for i, r in enumerate(results, 1):
-            match = "✓" if r["entityId"] in entity_ids.values() else "✗"
-            print(f"  {i}. [{r['type']}] {r['name']}  {match}")
+            payload = r.payload or {}
+            eid = payload.get("entityId", "")
+            match = "✓" if eid in entity_ids.values() else "✗"
+            print(f"  {i}. [{payload.get('type', 'Unknown')}] {payload.get('name', '')}  {match}")
 
     print("\nSeed + verify complete.")
 

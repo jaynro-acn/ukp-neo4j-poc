@@ -63,5 +63,5 @@ dist/
 # Conductor scratch + per-workspace probe scaffolding.
 .context/
 
-# LanceDB binary data — regenerate with: python3 scripts/seed_lancedb.py
-data/lancedb/
+# Qdrant local data — regenerate with: python3 scripts/seed_qdrant.py
+data/qdrant/
