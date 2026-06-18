@@ -124,11 +124,11 @@ That seam is the most important architecture decision validated by this repo.
 The complete smoke test is:
 
 ```bash
-.venv312/bin/python scripts/verify_stack.py
-.venv312/bin/python scripts/seed_neo4j.py
-.venv312/bin/python scripts/seed_qdrant.py
-.venv312/bin/python scripts/retrieve_graph_first.py ValueStream INVESTS_IN Capability "Digital Sales"
-.venv312/bin/python scripts/retrieve_semantic_first.py "what capabilities does Digital Sales invest in?" 5
+python3 scripts/verify_stack.py
+python3 scripts/seed_neo4j.py
+python3 scripts/seed_qdrant.py
+python3 scripts/retrieve_graph_first.py ValueStream INVESTS_IN Capability "Digital Sales"
+python3 scripts/retrieve_semantic_first.py "what capabilities does Digital Sales invest in?" 5
 ```
 
 The architecture is considered validated when:
