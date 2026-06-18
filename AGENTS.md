@@ -9,8 +9,7 @@
 
 ## What this repo is
 
-<!-- ONE sentence. Replace this. -->
-A monorepo for `<project-name>` — a `<one-line description of what it does and for whom>`.
+A local proof-of-concept for hybrid graph-plus-vector retrieval using Neo4j and Qdrant to validate retrieval patterns before a Neptune/OpenSearch production design.
 
 The detailed map of what lives where is in [`docs/architecture/overview.md`](docs/architecture/overview.md).
 **Read it before exploring.** It will save you 20 minutes of grep.
@@ -127,11 +126,11 @@ tasks, not most — the work-loop skill covers when it's the right tool.
 <!-- Keep this short. Detailed command reference goes in docs/. -->
 
 ```bash
-<install command>           # one-time setup
-<test command>              # run tests for the package you're in
-<test all command>          # run all tests (slow — usually CI's job)
-<lint command>              # lint + format check
-<build command>             # produce build artifacts
+/opt/homebrew/bin/python3.12 -m venv .venv312 && source .venv312/bin/activate
+pip install -r requirements.txt
+.venv312/bin/python scripts/verify_stack.py
+.venv312/bin/python scripts/seed_neo4j.py
+.venv312/bin/python scripts/seed_qdrant.py
 ```
 
 ## Code style

@@ -13,29 +13,17 @@ docs/specs/<feature>/
 └── notes/       ← (optional) research, sketches, rejected approaches
 ```
 
-## Active specs
+## Current specs
 
 <!-- Update this list as features are added. -->
 
 | Spec | Status | Constrained by | Notes |
 | --- | --- | --- | --- |
-| [neo4j-retrieval-poc](neo4j-retrieval-poc/spec.md) | Shipped | ADR-4 | Validates graph-first + semantic-first retrieval patterns locally (Neo4j + Qdrant) |
-
-## Shipped specs (archived)
-
-<!-- Once a feature is shipped, move its row here. The spec stays in place
-     as documentation of the feature's contract. -->
-
-| Spec | Status | Constrained by | Notes |
-| --- | --- | --- | --- |
-<!-- no shipped specs yet -->
+| [neo4j-retrieval-poc](neo4j-retrieval-poc/spec.md) | Shipped | ADR-4 | Current shipped POC validating graph-first + semantic-first retrieval locally |
 
 ## Adding a new spec
 
-```bash
-mkdir -p docs/specs/<feature-name>
-cp .claude/skills/new-spec/assets/spec.md docs/specs/<feature-name>/spec.md
-cp .claude/skills/new-spec/assets/plan.md docs/specs/<feature-name>/plan.md
-```
+Create a new directory under `docs/specs/` with a `spec.md` and `plan.md`.
 
-Or, in Claude Code, run `/new-spec "<feature-name>"`.
+For this repo, the easiest approach is to follow the same shape as
+`docs/specs/neo4j-retrieval-poc/` and keep the spec/plan pair together.

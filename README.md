@@ -1,24 +1,59 @@
 # Neo4j + Qdrant Hybrid Retrieval POC
 
-Local proof-of-concept validating a **hybrid graph + vector retrieval architecture** —
-graph-first and semantic-first patterns — before committing to a production stack
-(Amazon Neptune + OpenSearch).
+Local proof-of-concept validating a **hybrid graph + vector retrieval architecture**
+before committing to a production stack (Amazon Neptune + OpenSearch).
 
 > **Purpose:** Test both retrieval patterns against real seed data and document the
 > trade-offs to inform a retrieval architecture decision.
 
 ---
 
-## What this demonstrates
+## What this repo is
 
-- **Graph-first retrieval** — traverse the graph by node label + relationship type;
-  deterministic, zero noise, best for structural questions ("what depends on X?")
-- **Semantic-first retrieval** — embed a natural language query, search Qdrant for
-  top-k matches, resolve their IDs to Neo4j nodes, and hop to neighbors
-- **The `entityId` bridge** — a stable UUID on every node links the vector store and
-  the graph store, enabling the hybrid pattern
-- **Findings doc** — documents which pattern fits which consumer type and the observed
-  trade-offs
+This repo is a local validation harness for one architectural question:
+
+How should retrieval work when the source of truth is partly **graph-structured**
+and partly **semantic**?
+
+The POC uses:
+
+- **Neo4j** as the local graph store
+- **Qdrant** as the local vector store
+- **sentence-transformers** to generate embeddings
+- **graph-first retrieval** for precise structural traversal
+- **semantic-first retrieval** for natural-language discovery followed by graph hop
+
+The output is not just working scripts. The real deliverable is the documented
+decision support in [docs/findings.md](docs/findings.md).
+
+---
+
+## What question it answers
+
+The repo is designed to answer three practical questions:
+
+1. When is **graph-first** retrieval the better fit?
+2. When is **semantic-first** retrieval the better fit?
+3. Does a production MCP/tooling layer need **intent routing** between them?
+
+---
+
+## Fast Start
+
+If you just want to prove the POC works, the shortest useful path is:
+
+```bash
+/opt/homebrew/bin/python3.12 -m venv .venv312
+source .venv312/bin/activate
+pip install -r requirements.txt
+brew services start neo4j
+.venv312/bin/python scripts/verify_stack.py
+.venv312/bin/python scripts/seed_neo4j.py
+.venv312/bin/python scripts/seed_qdrant.py
+.venv312/bin/python scripts/retrieve_semantic_first.py "what handles an order?"
+```
+
+Then read [docs/findings.md](docs/findings.md).
 
 ---
 
@@ -29,7 +64,7 @@ graph-first and semantic-first patterns — before committing to a production st
 | Graph store | Neo4j (Homebrew) | Amazon Neptune |
 | Vector store | Qdrant (embedded local mode) | Amazon OpenSearch |
 | Embeddings | `all-MiniLM-L6-v2` (sentence-transformers) | OpenSearch embedding pipeline |
-| Language | Python 3.9+ | — |
+| Language | Python 3.12 | — |
 
 > Neo4j is used here because it runs locally with no cloud dependency. The Cypher
 > queries and retrieval patterns transfer directly to Neptune.
@@ -133,7 +168,8 @@ the graph store and the vector store.
 
 ### Graph-first
 
-Traverse Neo4j by node label + relationship + target label:
+Traverse Neo4j by node label + relationship + target label. Use this when you
+already know the entity or relationship shape you care about.
 
 ```bash
 # Structural queries
@@ -148,7 +184,8 @@ python3 scripts/retrieve_graph_first.py Subdomain CONTAINS BoundedContext "Check
 
 ### Semantic-first
 
-Natural language query → Qdrant vector search → `entityId` bridge → Neo4j graph hop:
+Natural language query → Qdrant vector search → `entityId` bridge → Neo4j graph hop.
+Use this when the caller does not know the schema and starts from intent.
 
 ```bash
 python3 scripts/retrieve_semantic_first.py "what handles an order?"
@@ -180,15 +217,23 @@ Run this exact sequence to validate the complete local stack and both retrieval 
 Expected high-level outcome:
 
 - Stack reports `Stack OK`
-- Neo4j seed completes with 24 nodes
-- Qdrant seed completes with 24 vectors
-- Graph-first returns two `INVESTS_IN` capability edges for `Digital Sales`
-- Semantic-first returns `Digital Sales` plus both capabilities in top-5 and graph hop output
+- Both stores seed successfully
+- Graph-first returns the two `INVESTS_IN` capability edges for `Digital Sales`
+- Semantic-first returns `Digital Sales` plus both capabilities and a valid graph hop
 
 Compatibility note:
 
-- Newer `qdrant-client` versions use `query_points` instead of `search`
-- This repo's scripts are updated to support current clients and keep compatibility behavior
+- Newer `qdrant-client` versions use `query_points` instead of `search`; the scripts handle both client shapes.
+
+---
+
+## How the retrieval flow works
+
+The implementation-level architecture is documented here:
+
+- [docs/architecture/overview.md](docs/architecture/overview.md) — repo structure and where to look first
+- [docs/architecture/retrieval-flow.md](docs/architecture/retrieval-flow.md) — runtime retrieval flow and `entityId` bridge
+- [docs/architecture/subdomains-bounded-contexts.md](docs/architecture/subdomains-bounded-contexts.md) — domain model and ubiquitous language split
 
 ---
 

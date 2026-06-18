@@ -1,81 +1,73 @@
 # Architecture Overview
 
-> The map of this monorepo. Read this first when exploring. Updated whenever
-> the directory layout or major dependencies change.
+> The map of this repository. Read this first when exploring the codebase.
 
-## Layout
+## Repository shape
+
+This repo is a focused POC, not a general monorepo. Most of the meaningful
+behavior lives in a small number of scripts and supporting docs.
 
 ```
 .
-├── AGENTS.md             # canonical agent context (CLAUDE.md is a symlink)
-├── apps/                 # deployable applications
-│   └── <app-name>/       # one directory per app
-├── packages/             # shared libraries (consumed by apps and other packages)
-│   └── <package-name>/
-├── tools/                # build, dev, and ops tooling — not shipped to users
-├── docs/
-│   ├── CHARTER.md        # mission, scope, principles (one page)
-│   ├── CONVENTIONS.md    # how we work
-│   ├── adr/              # architecture decisions (frozen history)
-│   ├── rfc/              # proposals (governance)
-│   ├── specs/            # feature specs and plans
-│   ├── architecture/     # this directory — current code structure (for contributors)
-│   ├── product/          # current product state (roadmap, changelog) — for maintainers
-│   └── guides/           # user-facing docs (Diátaxis: tutorials, how-to, reference, explanation)
-├── .claude/
-│   ├── skills/           # agent workflows for repeating tasks (each skill owns its templates under `assets/`)
-│   ├── agents/           # subagent definitions
-│   └── commands/         # custom slash commands
-└── .github/              # CI, issue and PR templates
+├── AGENTS.md
+├── README.md
+├── requirements.txt
+├── scripts/
+│   ├── verify_stack.py
+│   ├── seed_neo4j.py
+│   ├── seed_qdrant.py
+│   ├── retrieve_graph_first.py
+│   └── retrieve_semantic_first.py
+├── data/
+│   ├── entity_ids.json
+│   └── qdrant/
+└── docs/
+      ├── findings.md
+      ├── architecture/
+      │   ├── README.md
+      │   ├── overview.md
+      │   ├── retrieval-flow.md
+      │   └── subdomains-bounded-contexts.md
+      └── specs/
+            └── neo4j-retrieval-poc/
+                  ├── spec.md
+                  └── plan.md
 ```
 
-## Apps and packages
+## What each top-level area does
 
-<!--
-Replace this section with a real listing of your apps and packages.
-The ideal entry tells an agent: what is this, what does it depend on, and
-where do I look first?
+- `scripts/` — executable core.
+  - `verify_stack.py` checks the local stack.
+  - `seed_neo4j.py` creates graph nodes and relationships.
+  - `seed_qdrant.py` embeds the same entities into Qdrant.
+  - `retrieve_graph_first.py` runs explicit structural traversal.
+  - `retrieve_semantic_first.py` runs vector search, then graph hop.
 
-- `apps/web/` — the public-facing web app (Next.js). Depends on `packages/api-client`,
-  `packages/ui`. Entry point: `app/page.tsx`.
-- `packages/api-client/` — typed HTTP client for the API. Generated from
-  the OpenAPI spec in `apps/api/openapi.yaml`.
-- ...
--->
+- `data/` — generated local state.
+  - `entity_ids.json` is the graph/vector bridge.
+  - `qdrant/` is regenerable embedded vector data.
 
-<!--
-Optional section. If this project ships skill/agent packs, list them
-here with a one-line purpose each. Delete this section if you don't
-ship packs.
+- `docs/findings.md` — decision output.
 
-Example:
+- `docs/specs/neo4j-retrieval-poc/` — delivery contract and implementation plan.
 
-- `<pack-name>` — <one-line purpose>. <scope: repo-only / user-scope / both>.
--->
-<list your packs and packages here>
+- `docs/architecture/` — current structure and retrieval flow.
 
-## Conventions you'll see across packages
+## Runtime architecture
 
-<!--
-Things that are true of every package in the monorepo. Example:
+The key architectural seam is the `entityId` bridge:
 
-- Every package has its own `AGENTS.md` describing package-specific rules.
-- Every package exports a `package.json` with `main`, `module`, and `types`.
-- Every package has a `README.md` aimed at human consumers.
+1. `seed_neo4j.py` creates graph nodes with stable `entityId` values.
+2. `seed_qdrant.py` embeds the same entities and stores the same `entityId` in payloads.
+3. `retrieve_semantic_first.py` uses Qdrant to find relevant entities, then resolves them back into Neo4j by `entityId`.
 
-Add yours here.
--->
+That bridge is what makes the hybrid retrieval pattern possible.
+
+See [retrieval-flow.md](retrieval-flow.md) for the execution path.
 
 ## Where to start
 
-<!--
-A short, opinionated path for someone new to the repo. Example:
-
-1. Read [`docs/CHARTER.md`](../CHARTER.md) — the project's mission and scope.
-2. Read this file (architecture overview).
-3. Skim [`docs/product/roadmap.md`](../product/roadmap.md) for current direction.
-4. Pick a recent feature in `docs/specs/` and read its `spec.md` and `plan.md`
-   side by side with the resulting code in `apps/` or `packages/`.
-5. Look at the latest 3 ADRs in `docs/adr/` to see the kinds of decisions
-   we record.
--->
+1. Read [README.md](/Users/jaynro.a.perez/Documents/vault/40-research/ukp-neo4j-poc/README.md) for setup and the happy path.
+2. Read [retrieval-flow.md](retrieval-flow.md) to understand the two retrieval patterns.
+3. Read [subdomains-bounded-contexts.md](subdomains-bounded-contexts.md) to understand the domain model and the “Order” ambiguity.
+4. Read [findings.md](/Users/jaynro.a.perez/Documents/vault/40-research/ukp-neo4j-poc/docs/findings.md) for the architectural conclusions.
